@@ -1,4 +1,6 @@
 # Prometheus exporter for EMC ECS
+[![Build Status](https://api.travis-ci.com/paychex/prometheus-emcecs-exporter.svg?branch=master)](https://travis-ci.com/paychex/prometheus-emcecs-exporter/builds)
+[![Go Report Card](https://goreportcard.com/badge/github.com/paychex/prometheus-emcecs-exporter)](https://goreportcard.com/report/github.com/paychex/prometheus-emcecs-exporter)
 
 This exporter collects performance and metrics stats from Dell EMC ECS clusters running version 3.x and above and makes it avaialble for Prometheus to scrape.  It is not recommeded that you run this tool on the Dell EMC ECS Cluster node(s), instead it should be run on a seperate machine.  The application can be configured to monitor just one cluster, or can be configured to query multiple Dell EMC ECS clusters.  See configuration options below for how to use this tool.
 
