@@ -134,7 +134,7 @@ func NewEcsClusterCollector(emcecs *ecsclient.EcsClient, namespace string) (*Ecs
 func (e *EcsClusterCollector) Collect(ch chan<- prometheus.Metric) {
 	log.Debugln("ECS Cluster collect starting")
 	if e.ecsClient == nil {
-		log.Errorf("ECS client not configured.")
+		log.Errorln("ECS client not configured.")
 		return
 	}
 

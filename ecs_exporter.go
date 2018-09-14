@@ -11,6 +11,9 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/paychex/prometheus-emcecs-exporter/collector"
 	"github.com/paychex/prometheus-emcecs-exporter/config"
@@ -109,7 +112,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	c.RetrieveNodeInfo()
 	log.Debug("ECS Cluster version is: " + c.EcsVersion)
-	log.Debug("ECS Cluster node count: %v", c.RetrieveNodeCount())
+	log.Debugf("ECS Cluster node count: %v", c.RetrieveNodeCount())
 	ecsClusterInfo.WithLabelValues(c.EcsVersion, strconv.Itoa(c.RetrieveNodeCount())).Set(1)
 
 	if r.URL.Query().Get("metering") == "1" {
@@ -162,6 +165,21 @@ func main() {
 	log.Infof("commit: %s, build time: %s, release: %s",
 		version.Commit, version.BuildTime, version.Release,
 	)
+
+	// enable signal trapping
+	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c,
+			syscall.SIGINT,  // Ctrl+C
+			syscall.SIGTERM, // Termination Request
+			syscall.SIGSEGV, // FullDerp
+			syscall.SIGABRT, // Abnormal termination
+			syscall.SIGILL,  // illegal instruction
+			syscall.SIGFPE)  // floating point
+		sig := <-c
+		log.Fatalf("Signal (%v) Detected, Shutting Down", sig)
+	}()
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
             <head>

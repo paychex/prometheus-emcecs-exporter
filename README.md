@@ -15,6 +15,14 @@ This exporter collects performance and metrics stats from Dell EMC ECS clusters 
 | bind_port    | Port to bind the exporter endpoint to                                                                     | 9438          | ECSENV_BIND_PORT    |
 | bind_address | Address to bind the exporter endpoint to                                                                  | localhost     | ECSENV_BIND_ADDRESS |
 
+### Port Requirements
+
+The following ports need to be open between the ECS array and the exporter:
+
+* 9101
+* 9020
+* 4443
+
 ### Running in multi-query mode
 
 While normally one runs one exporter per device, this exporter works a little different.  The exporter is designed to work by default in a "multi-query" mode.  This setup works similar to the [SNMP exporter](https://github.com/prometheus/snmp_exporter).  Note that you will need to configure each ECS cluster to use the same username and password for this to work properly.  You can still monitor just one array if you so choose, its just a few extra lines in your Prometheus config file.
@@ -134,7 +142,22 @@ This exporter exports information in two ways.  The first is a standard export o
 
 ## Building
 
-This exporter can run on any go supported platform.  To build run:
+This exporter can run on any go supported platform.  Depending on which version of go you are using the build process is slightly different.  Use the instructions below to find your proper build process.
+
+### Go 1.11
+
+Eventually we will move to just supporting go 1.11 and forward, once modules are more set in stone.  Until then, we will use the modules support for Gopkg and let go 1.11 build its deps up on the fly.  If you use the go modules support, make sure you DO NOT have the source in your go path, or you will get errors.
+
+`go mod init && go build`
+
+You can also run:
+`go get github.com/paychex/prometheus-emcecs-exporter`
+
+### Go 1.10 or Earlier
+
+This exporter can run on any go supported platform.  Using dep, the dependencies have been checked into the vendor directory.  In the future, the vendor directory will be removed from source.
+
+To build run:
 `go build`
 
 You can also run:
