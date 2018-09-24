@@ -3,6 +3,7 @@ package ecsclient
 import (
 	"crypto/tls"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -16,7 +17,7 @@ import (
 type EcsClient struct {
 	UserName       string
 	Password       string
-	authToken      string
+	AuthToken      string
 	ClusterAddress string
 	nodeList       []string
 	EcsVersion     string
@@ -45,7 +46,7 @@ type pingList struct {
 }
 
 // RetrieveAuthToken and store as part of the client struct for future use
-func (c *EcsClient) RetrieveAuthToken() {
+func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 	reqLoginURL := "https://" + c.ClusterAddress + ":4443/login"
 
 	log.Debugf("Using the following info to log into the ECS, username: %v, URL: %v", c.UserName, c.ClusterAddress)
@@ -63,33 +64,37 @@ func (c *EcsClient) RetrieveAuthToken() {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-	}}
+	},
+		Timeout: 15 * time.Second}
 	req, _ := http.NewRequest("GET", reqLoginURL, nil)
 	req.SetBasicAuth(c.UserName, c.Password)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("\n - Error connecting to ECS: %s", err)
+		log.Infof("\n - Error connecting to ECS: %s", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	log.Debug("Response Status Code: %v", resp.StatusCode)
-	log.Debug("Response Status: %v", resp.Status)
-	log.Debug("Response Body: %v", resp.Body)
-	log.Debug("AuthToken is: %v", resp.Header.Get("X-Sds-Auth-Token"))
+	log.Debugf("Response Status Code: %v", resp.StatusCode)
+	log.Debugf("Response Status: %v", resp.Status)
+	log.Debugf("Response Body: %v", resp.Body)
+	log.Debugf("AuthToken is: %v", resp.Header.Get("X-Sds-Auth-Token"))
 
 	if resp.StatusCode != 200 {
 		// we didnt get a good response code, so bailing out
 		log.Infoln("Got a non 200 response code: ", resp.StatusCode)
 		log.Debugln("response was: ", resp)
 		c.ErrorCount++
+		return "", fmt.Errorf("received non 200 error code: %v. the response was: %v", resp.Status, resp)
 	}
-	c.authToken = resp.Header.Get("X-Sds-Auth-Token")
+	c.AuthToken = resp.Header.Get("X-Sds-Auth-Token")
+	return resp.Header.Get("X-Sds-Auth-Token"), nil
 
 }
 
 // Logout closes out the connection to ECS when we are done.
 // if we dont log out we use up all of the available login tokens
-func (c *EcsClient) Logout() {
+func (c *EcsClient) Logout() error {
 	// there’s a maximum number of login tokens (100) per user
 	// need to log out to throw away the token since we arent set up for caching...
 
@@ -98,11 +103,16 @@ func (c *EcsClient) Logout() {
 	log.Infof("Logging out of %s", c.ClusterAddress)
 
 	// we dont need the reply data, so just throw it away
-	_ = c.CallECSAPI(reqLogoutURL, 3)
-	c.authToken = ""
+	_, err := c.CallECSAPI(reqLogoutURL)
+	if err != nil {
+		log.Infof("Error logging out of ECS: %s", c.ClusterAddress)
+		return err
+	}
+	c.AuthToken = ""
+	return nil
 }
 
-func (c *EcsClient) CallECSAPI(request string, retryAttempts int) string {
+func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	client := &http.Client{Transport: &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -115,63 +125,61 @@ func (c *EcsClient) CallECSAPI(request string, retryAttempts int) string {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-	}}
+	},
+		Timeout: 45 * time.Second}
 	req, _ := http.NewRequest("GET", request, nil)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-SDS-AUTH-TOKEN", c.authToken)
+	req.Header.Add("X-SDS-AUTH-TOKEN", c.AuthToken)
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("\n - Error connecting to ECS: %s", err)
+		log.Infof("\n - Error connecting to ECS: %s", err)
+		return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, err)
 	}
 	defer resp.Body.Close()
 	respText, err := ioutil.ReadAll(resp.Body)
 	s := string(respText)
-	if resp.StatusCode == 200 {
-		log.Debugln(s)
-	} else {
-		if retryAttempts >= 1 {
-			log.Infof("Got unknown code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
-			// to do need to re-auth to get back into system
-			log.Info("Attempting to re-log into the ECS and retrying command")
-			c.RetrieveAuthToken()
-			// now lets recursively call ourselves and hopefully we get in again
-			s = c.CallECSAPI(request, retryAttempts-1)
-			c.ErrorCount++
-		} else {
-			s = ""
-		}
+
+	if resp.StatusCode != 200 {
+		log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
+		return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 	}
-	return s
+	return s, nil
 }
 
 // RetrieveReplState will return a struct containing the state of the ECS cluster on query
-func (c *EcsClient) RetrieveReplState() EcsReplState {
+func (c *EcsClient) RetrieveReplState() (EcsReplState, error) {
 	// this will only pull the current stats, which is what we want for this application
 	// reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone?dataType=current"
 	reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone/replicationgroups"
 
-	s := c.CallECSAPI(reqStatusURL, 3)
+	s, err := c.CallECSAPI(reqStatusURL)
+	if err != nil {
+		return EcsReplState{}, err
+	}
 
 	return EcsReplState{
-		RgName: gjson.Get(s, "name").String(),
+		RgName:                                   gjson.Get(s, "name").String(),
 		ReplicationIngressTraffic:                gjson.Get(s, "replicationIngressTraffic").Float(),
 		ReplicationEgressTraffic:                 gjson.Get(s, "replicationEgressTraffic").Float(),
 		ChunksRepoPendingReplicationTotalSize:    gjson.Get(s, "chunksRepoPendingReplicationTotalSize").Float(),
 		ChunksJournalPendingReplicationTotalSize: gjson.Get(s, "chunksJournalPendingReplicationTotalSize").Float(),
 		ChunksPendingXorTotalSize:                gjson.Get(s, "chunksPendingXorTotalSize").Float(),
 		ReplicationRpoTimestamp:                  gjson.Get(s, "replicationRpoTimestamp").Float(),
-	}
+	}, nil
 }
 
 // RetrieveClusterState will return a struct containing the state of the ECS cluster on query
-func (c *EcsClient) RetrieveClusterState() EcsClusterState {
+func (c *EcsClient) RetrieveClusterState() (EcsClusterState, error) {
 
 	// this will only pull the current stats, which is what we want for this application
 	// reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone?dataType=current"
 	reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone"
 
-	s := c.CallECSAPI(reqStatusURL, 3)
+	s, err := c.CallECSAPI(reqStatusURL)
+	if err != nil {
+		return EcsClusterState{}, err
+	}
 
 	fields := EcsClusterState{
 		VdcName:                               gjson.Get(s, "name").String(),
@@ -195,7 +203,7 @@ func (c *EcsClient) RetrieveClusterState() EcsClusterState {
 		TransactionWriteBandwidthCurrent:      gjson.Get(s, "transactionWriteBandwidthCurrent.0.Bandwidth").Float(),
 		TransactionReadBandwidthCurrent:       gjson.Get(s, "transactionReadBandwidthCurrent.0.Bandwidth").Float(),
 	}
-	return fields
+	return fields, nil
 
 }
 
@@ -220,8 +228,11 @@ func (c *EcsClient) RetrieveNodeInfo() {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Fatal("Error connecting to ECS Cluster at: " + reqStatusURL)
+		log.Info("Error connecting to ECS Cluster at: " + reqStatusURL)
+		c.nodeList = nil
+		c.EcsVersion = ""
 		c.ErrorCount++
+		return
 	}
 	defer resp.Body.Close()
 

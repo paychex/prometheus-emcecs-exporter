@@ -50,7 +50,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 	start := time.Now()
 	// create a function to go get a list of all namespaces
 	nameSpaceReq := "https://" + e.ecsClient.ClusterAddress + ":4443/object/namespaces"
-	n := e.ecsClient.CallECSAPI(nameSpaceReq, 2)
+	n, _ := e.ecsClient.CallECSAPI(nameSpaceReq)
 
 	result := gjson.Get(n, "namespace.#.name")
 	// We need to limit the number of requests going to the API at once
@@ -70,14 +70,14 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 			defer func() { <-sem }()
 			// retrieve the quota applied
 			namespaceInfoReq := "https://" + e.ecsClient.ClusterAddress + ":4443/object/namespaces/namespace/" + ns + "/quota"
-			n := e.ecsClient.CallECSAPI(namespaceInfoReq, 2)
+			n, _ := e.ecsClient.CallECSAPI(namespaceInfoReq)
 			if gjson.Get(n, "blockSize").Float() > 0 {
 				ch <- prometheus.MustNewConstMetric(nameSpaceQuota, prometheus.GaugeValue, gjson.Get(n, "blockSize").Float()*gb2kb, ns, "block")
 				ch <- prometheus.MustNewConstMetric(nameSpaceQuota, prometheus.GaugeValue, gjson.Get(n, "notificationSize").Float()*gb2kb, ns, "notification")
 			}
 			// retrieve the current metering info
 			namespaceInfoReq = "https://" + e.ecsClient.ClusterAddress + ":4443/object/billing/namespace/" + ns + "/info?sizeunit=KB"
-			n = e.ecsClient.CallECSAPI(namespaceInfoReq, 2)
+			n, _ = e.ecsClient.CallECSAPI(namespaceInfoReq)
 			ch <- prometheus.MustNewConstMetric(nameSpaceObjectTotal, prometheus.GaugeValue, gjson.Get(n, "total_objects").Float(), ns)
 			ch <- prometheus.MustNewConstMetric(nameSpaceQuota, prometheus.GaugeValue, gjson.Get(n, "total_size").Float(), ns, "used")
 		}()
@@ -87,7 +87,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 		sem <- true
 	}
 	duration := float64(time.Since(start).Seconds())
-	log.Infof("Scrape of metering took %f seconds", duration)
+	log.Infof("Scrape of metering took %f seconds for cluster %s", duration, e.ecsClient.ClusterAddress)
 	log.Infoln("Metering exporter finished")
 }
 

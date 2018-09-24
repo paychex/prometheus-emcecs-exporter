@@ -134,11 +134,15 @@ func NewEcsClusterCollector(emcecs *ecsclient.EcsClient, namespace string) (*Ecs
 func (e *EcsClusterCollector) Collect(ch chan<- prometheus.Metric) {
 	log.Debugln("ECS Cluster collect starting")
 	if e.ecsClient == nil {
-		log.Errorln("ECS client not configured.")
+		log.Errorf("ECS client not configured.")
 		return
 	}
 
-	fields := e.ecsClient.RetrieveClusterState()
+	fields, err := e.ecsClient.RetrieveClusterState()
+	if err != nil {
+		log.Error("Cluster exporter received no info from array.")
+		return
+	}
 
 	// fmt.Printf("TotalDTNum: %v, UnreadyNum: %v, UnKnownNum: %v, NodeIP: %v\n", node.TotalDTnum, node.UnreadyDTnum, node.UnknownDTnum, node.NodeIP)
 	ch <- prometheus.MustNewConstMetric(transactionsuccess, prometheus.CounterValue, fields.TransactionSuccessTotal, fields.VdcName)

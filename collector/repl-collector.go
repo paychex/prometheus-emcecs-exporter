@@ -64,8 +64,11 @@ func (e *EcsReplCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	replState := e.ecsClient.RetrieveReplState()
-	// fmt.Printf("Replication state is %v \n", replState)
+	replState, err := e.ecsClient.RetrieveReplState()
+	if err != nil {
+		log.Error("Replication exporter received no info from array.")
+		return
+	}
 
 	ch <- prometheus.MustNewConstMetric(replingresstraffic, prometheus.GaugeValue, replState.ReplicationIngressTraffic, replState.RgName)
 	ch <- prometheus.MustNewConstMetric(replegresstraffic, prometheus.GaugeValue, replState.ReplicationEgressTraffic, replState.RgName)
