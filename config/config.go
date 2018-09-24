@@ -17,6 +17,7 @@ type exporterConfig struct {
 	BindAddress string
 	BindPort    int
 	Multiconfig bool
+	Debug       bool
 }
 
 // Config is a container for settings modifiable by the user
@@ -32,6 +33,7 @@ var (
 	ecsPassword   = flag.String("password", "defaultPass", "Password")
 	listenAddress = flag.String("bind_address", "localhost", "Exporter bind address")
 	listenPort    = flag.Int("bind_port", 9438, "Exporter bind port")
+	debugLevel    = flag.Bool("debug", false, "enable  debug messages")
 	// multiQuery    = flag.Bool("multi", false, "Enable query endpoint")
 )
 
@@ -55,7 +57,7 @@ func GetConfig() *Config {
 		Exporter: exporterConfig{
 			BindAddress: *listenAddress,
 			BindPort:    *listenPort,
-			// Multiconfig: *multiQuery,
+			Debug:       *debugLevel,
 		},
 	}
 }
