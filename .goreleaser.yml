@@ -1,17 +1,26 @@
-# .goreleaser.yml
-# Build customization
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
 builds:
-  - main: ecs_exporter.go
-binary: prometheus-emcecs-exporter
-goos:
-# This would probably work on windows and osx, but I have never tested it
-# so I am not going to build the windows binaries unless someone opens a bug request
-#  - windows
-#  - darwin
+- env:
+  - CGO_ENABLED=0
+- builds:
   - linux
-goarch:
+- goarch:
   - amd64
-  - arm64
-# Archive customization
 archive:
-  format: tar.gz
+  replacements:
+    darwin: Darwin
+    linux: Linux
+    windows: Windows
+    386: i386
+    amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
