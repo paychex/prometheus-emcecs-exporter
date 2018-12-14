@@ -3,12 +3,13 @@
 before:
   hooks:
 builds:
-- env:
-  - CGO_ENABLED=0
-- builds:
-  - linux
-- goarch:
-  - amd64
+  - 
+    env:
+    - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
 archive:
   replacements:
     darwin: Darwin
