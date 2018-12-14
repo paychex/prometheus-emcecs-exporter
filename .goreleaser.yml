@@ -1,0 +1,17 @@
+# .goreleaser.yml
+# Build customization
+builds:
+  - main: ecs_exporter.go
+binary: prometheus-emcecs-exporter
+goos:
+# This would probably work on windows and osx, but I have never tested it
+# so I am not going to build the windows binaries unless someone opens a bug request
+#  - windows
+#  - darwin
+  - linux
+goarch:
+  - amd64
+  - arm64
+# Archive customization
+archive:
+  format: tar.gz
