@@ -1,6 +1,6 @@
 all: build
 
 build:
-	go test
-	go build
+	env GO111MODULE=on go test
+	env GO111MODULE=on go build 
 
