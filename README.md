@@ -108,6 +108,8 @@ This exporter exports information in two ways.  The first is a standard export o
 # TYPE emcecs_cluster_space_total gauge
 # HELP emcecs_cluster_transaction_error Count of transaction errors
 # TYPE emcecs_cluster_transaction_error counter
+# HELP emcecs_cluster_transaction_error_detail error codes broken down by protocol category and error
+# TYPE emcecs_cluster_transaction_error_detail counter
 # HELP emcecs_cluster_transaction_read_bandwidth Cluster transaction read bandwidth in MB/S
 # TYPE emcecs_cluster_transaction_read_bandwidth gauge
 # HELP emcecs_cluster_transaction_read_latency Transaction read latency in ms
