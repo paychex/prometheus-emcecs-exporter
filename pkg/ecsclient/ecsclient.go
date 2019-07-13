@@ -287,9 +287,9 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	xml.Unmarshal(bytes, parsedOutput)
 
 	// ECS supplies the current number of active connections, but its per node
-	// and its part of the s3 retrieval api (ie port 9020) so lets get this and pass it along as well
+	// and its part of the s3 retrieval api (ie port 9021) so lets get this and pass it along as well
 	// and its in yet another format ... or at least xml layed out differently, so more processing is needed
-	reqConnectionsURL := "http://" + node + ":9020/?ping"
+	reqConnectionsURL := "https://" + node + ":9021/?ping"
 	log.Debug("URL we are checking for connections is ", reqConnectionsURL)
 
 	respConn, err := http.Get(reqConnectionsURL)
