@@ -1,2 +1,2 @@
-prometheus-emcecs-exporter
+bin/prometheus-emcecs-exporter
 dist/*
