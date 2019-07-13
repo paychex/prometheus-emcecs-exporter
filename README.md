@@ -1,4 +1,5 @@
 # Prometheus exporter for EMC ECS
+
 [![Build Status](https://api.travis-ci.com/paychex/prometheus-emcecs-exporter.svg?branch=master)](https://travis-ci.com/paychex/prometheus-emcecs-exporter/builds)
 [![Go Report Card](https://goreportcard.com/badge/github.com/paychex/prometheus-emcecs-exporter)](https://goreportcard.com/report/github.com/paychex/prometheus-emcecs-exporter)
 
@@ -11,7 +12,7 @@ This exporter collects performance and metrics stats from Dell EMC ECS clusters 
 | username     | Username with which to connect to the Dell EMC ECS API | none          | ECSENV_USERNAME     |
 | password     | Password with which to connect to the Dell EMC ECS API | none          | ECSENV_PASSWORD     |
 | mgmt_port    | The port which ecs listens to for administration       | 4443          | ECSENV_MGMT_PORT    |
-| obj_port     | The port which ecs listens to for object calls         | 9020          | ECSENV_OBJ_PORT     |
+| obj_port     | The port which ecs listens to for object calls         | 9021          | ECSENV_OBJ_PORT     |
 | bind_port    | Port to bind the exporter endpoint to                  | 9438          | ECSENV_BIND_PORT    |
 | bind_address | Address to bind the exporter endpoint to               | localhost     | ECSENV_BIND_ADDRESS |
 | debug        | Enable verbose debugging messages                      | false         | ECSENV_DEBUG        |
@@ -21,7 +22,7 @@ This exporter collects performance and metrics stats from Dell EMC ECS clusters 
 The following ports need to be open between the ECS array and the exporter:
 
 * 9101
-* 9020
+* 9021
 * 4443
 
 ### Running in multi-query mode
@@ -162,20 +163,7 @@ The following items are presented on the /metrics endpoint which gives the prome
 
 ## Building
 
-This exporter can run on any go supported platform.  Depending on which version of go you are using the build process is slightly different.  Use the instructions below to find your proper build process.
-
-### Go 1.11
-
-Eventually we will move to just supporting go 1.11 and forward, once modules are more set in stone.  Until then, we will use the modules support for Gopkg and let go 1.11 build its deps up on the fly.  If you use the go modules support, make sure you DO NOT have the source in your go path, or you will get errors.
-
-`go mod init && go build`
-
-You can also run:
-`go get github.com/paychex/prometheus-emcecs-exporter`
-
-### Go 1.10 or Earlier
-
-This exporter can run on any go supported platform.  Using dep, the dependencies have been checked into the vendor directory.  In the future, the vendor directory will be removed from source.
+This exporter can run on any go supported platform.  As of version 1.2 we have moved to using Go 1.11 and higher. Testing is done with Go 1.12 but go 1.11 should work for anyone using it.
 
 To build run:
 `go build`
@@ -185,8 +173,8 @@ You can also run:
 
 ## Refrences
 
-- https://www.emc.com/techpubs/api/ecs/v2-0-0-0/index.htm 
+- https://www.emc.com/techpubs/api/ecs/v2-0-0-0/index.htm
 
-## Author 
+## Author
 
 This exporter was originally written by [Mark DeNeve](https://github.com/xphyr)

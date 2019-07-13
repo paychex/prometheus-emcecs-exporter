@@ -28,7 +28,7 @@ type Config struct {
 
 var (
 	ecsMgmtPort   = flag.Int("mgmt_port", 4443, "The port which ecs listens to for administration")
-	ecsObjPort    = flag.Int("obj_port", 9020, "The port which ecs listens to for object calls")
+	ecsObjPort    = flag.Int("obj_port", 9021, "The port which ecs listens to for object calls")
 	ecsUserName   = flag.String("username", "defaultUser", "Username")
 	ecsPassword   = flag.String("password", "defaultPass", "Password")
 	listenAddress = flag.String("bind_address", "localhost", "Exporter bind address")
