@@ -258,7 +258,7 @@ func (c *EcsClient) RetrieveNodeInfoV2() {
 	}
 
 	c.nodeList = parsedOutput.DataNodes
-	c.EcsVersion = parsedOutput.VersionInfo
+	c.EcsVersion = gjson.Get(s, "node.0.version").String()
 
 }
 
