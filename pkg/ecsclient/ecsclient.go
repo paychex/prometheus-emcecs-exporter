@@ -234,6 +234,34 @@ func (c *EcsClient) RetrieveNodeCount() int {
 	return len(c.nodeList)
 }
 
+// RetrieveNodeInfoV2 will replace RetrieveNodeInfo code, getting nodes from the object API
+// We should be able to make this a drop in replacement with just a little work.
+func (c *EcsClient) RetrieveNodeInfoV2() {
+	parsedOutput := &dataNodes{}
+
+	// Get the list of nodes from the Management API
+	reqStatusURL := "https://" + c.ClusterAddress + ":4443/vdc/nodes"
+
+	s, err := c.CallECSAPI(reqStatusURL)
+	if err != nil {
+		return
+	}
+
+	result := gjson.Get(s, "node.#.ip")
+	for _, ip := range result.Array() {
+		// according to the docs, the IP address it returns is weird
+		// eg. "10.247.179.238:11001:20069:10901", with no explination of what the other values are
+		// so we need to get just the ipv4 off the string
+
+		ipcleanup := strings.Split(ip.String(), ":")
+		parsedOutput.DataNodes = append(parsedOutput.DataNodes, ipcleanup[0])
+	}
+
+	c.nodeList = parsedOutput.DataNodes
+	c.EcsVersion = parsedOutput.VersionInfo
+
+}
+
 // RetrieveNodeInfo will retrieve a list of individual nodes in the cluster
 // this is used to pull DTstats later on
 func (c *EcsClient) RetrieveNodeInfo() {

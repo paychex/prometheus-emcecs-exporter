@@ -5,6 +5,7 @@ RELEASE?=$(shell git describe --abbrev=4 --dirty --always --tags)
 COMMIT?=$(shell git rev-parse --short HEAD)
 
 all: clean build
+goreleaser_hook: clean goreleaser_pre
 
 build:
 	GO111MODULE=on go build -o bin/${TARGET_BINARY} \
@@ -15,6 +16,15 @@ build:
 
 goreleaser:
 	goreleaser --snapshot --skip-publish --rm-dist
+
+# This is needed to make goreleaser work in Travis
+# Since cross compiling requires special modules for Windows
+# we need to run the commands for both Windows and Linux
+goreleaser_pre:
+	GOOS=linux GOARCH=amd64 go mod download
+	GOOS=windows GOARCH=amd64 go mod download
+	GOOS=linux GOARCH=amd64 go get ./...
+	GOOS=windows GOARCH=amd64 go get ./...
 
 clean:
 	for file in bin/$(TARGET_BINARY); do \

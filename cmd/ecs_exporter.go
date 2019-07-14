@@ -138,7 +138,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	c := ecsclient.NewECSClient(config.ECS.UserName, config.ECS.Password, target)
 
 	log.Info("Connecting to ECS Cluster: " + target)
-	c.RetrieveNodeInfo()
+	c.RetrieveNodeInfoV2()
 	log.Debugf("ECS Cluster version is: %v", c.EcsVersion)
 	log.Debugf("ECS Cluster node count: %v", c.RetrieveNodeCount())
 	ecsClusterInfo.WithLabelValues(c.EcsVersion, strconv.Itoa(c.RetrieveNodeCount())).Set(1)
