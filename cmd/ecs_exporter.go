@@ -32,12 +32,12 @@ var (
 	ecsURL string
 	config *ecsconfig.Config
 
-	// BuildTime is a time label of the moment when the binary was built
-	BuildTime = "unset"
-	// Commit is a last commit hash at the moment when the binary was built
-	Commit = "unset"
-	// Release is a semantic version of current build
-	Release = "unset"
+	// date is a time label of the moment when the binary was built
+	date = "unset"
+	// commit is a last commit hash at the moment when the binary was built
+	commit = "unset"
+	// version is a semantic version of current build
+	version = "unset"
 
 	// Metrics about the EMC ECS exporter itself.
 	ecsCollectionRequestErrors = prometheus.NewCounter(
@@ -76,7 +76,7 @@ func init() {
 	log.Formatter = new(logrus.TextFormatter)
 
 	//
-	ecsCollectionBuildInfo.WithLabelValues(Release, Commit, runtime.Version()).Set(1)
+	ecsCollectionBuildInfo.WithLabelValues(version, commit, runtime.Version()).Set(1)
 	prometheus.MustRegister(ecsCollectionBuildInfo)
 	prometheus.MustRegister(ecsAuthCacheCounterHit)
 	prometheus.MustRegister(ecsAuthCacheCounterMiss)
@@ -286,7 +286,7 @@ func main() {
 
 	log.Info("Starting the ECS Exporter service...")
 	log.Infof("commit: %s, build time: %s, release: %s",
-		Commit, BuildTime, Release,
+		commit, date, version,
 	)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
