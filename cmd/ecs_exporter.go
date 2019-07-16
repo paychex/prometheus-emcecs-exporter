@@ -69,7 +69,7 @@ var (
 		},
 	)
 
-	authTokenCache sync.Map
+	clientCache sync.Map
 )
 
 func init() {
@@ -135,69 +135,34 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := ecsclient.NewECSClient(config.ECS.UserName, config.ECS.Password, target)
+	// look to see if we have a ECS client already defined for this target
+	var ok bool
+	var result interface{}
+	result, ok = clientCache.Load(target)
+	if !ok {
+		// We did not have a client cached. We need to create one and store it
+		log.Debugf("Creating new ECS Client for %s", target)
+		c := ecsclient.NewECSClient(config.ECS.UserName, config.ECS.Password, target)
 
-	log.Info("Connecting to ECS Cluster: " + target)
+		err := c.Login()
+		if err != nil {
+			log.Infof("target: %s could not be logged into, the error was %s", target, err)
+			ecsCollectionRequestErrors.Inc()
+			ecsCollectionSuccess.WithLabelValues(target).Set(0)
+			h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+			h.ServeHTTP(w, r)
+			return
+		}
+		clientCache.Store(target, c)
+		result, _ = clientCache.Load(target)
+	}
+
+	c := result.(*ecsclient.EcsClient)
+
 	c.RetrieveNodeInfoV2()
 	log.Debugf("ECS Cluster version is: %v", c.EcsVersion)
 	log.Debugf("ECS Cluster node count: %v", c.RetrieveNodeCount())
 	ecsClusterInfo.WithLabelValues(c.EcsVersion, strconv.Itoa(c.RetrieveNodeCount())).Set(1)
-
-	// Need to get rid of the goto cheat.
-	// replacing with a for loop, and ensureing it has backoff and
-	// a short circuit
-	lc := 1
-	for lc < 4 {
-		log.Debugf("Looking for cached Auth Token for %s", target)
-		var ok bool
-		result, ok := authTokenCache.Load(target)
-		if !ok {
-			log.Debug("Authtoken not found in cache.")
-			log.Debugf("Retrieving ECS authToken for %s", target)
-			// get our authtoken for future interactions
-			a, err := c.RetrieveAuthToken()
-			if err != nil {
-				log.Debugf("Error getting auth token for %s", target)
-
-				ecsCollectionRequestErrors.Inc()
-				ecsCollectionSuccess.WithLabelValues(target).Set(0)
-				h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
-				h.ServeHTTP(w, r)
-				return
-			}
-			authTokenCache.Store(target, a)
-			result, _ := authTokenCache.Load(target)
-			c.AuthToken = result.(string)
-			ecsAuthCacheCounterMiss.Inc()
-		} else {
-			log.Debugf("Authtoken pulled from cache for %s", target)
-			c.AuthToken = result.(string)
-			ecsAuthCacheCounterHit.Inc()
-		}
-
-		// test to make sure that our auth token is good
-		// if not delete it and loop back to our login logic above
-		validateLoginURL := "https://" + c.ClusterAddress + ":4443/user/whoami"
-		_, err = c.CallECSAPI(validateLoginURL)
-		if err != nil {
-			authTokenCache.Delete(target)
-			log.Infof("Invalidating authToken for %s", target)
-			lc += 1
-		} else {
-			// we have a valid auth token we can break out of this loop
-			break
-		}
-	}
-	if lc > 3 {
-		// we looped and failed multiple times, so no need to go further
-		log.Debugf("Error getting auth token for %s", target)
-
-		ecsCollectionRequestErrors.Inc()
-		ecsCollectionSuccess.WithLabelValues(target).Set(0)
-		h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
-		h.ServeHTTP(w, r)
-		return
-	}
 
 	if r.URL.Query().Get("metering") == "1" {
 		// get just metering information
@@ -242,14 +207,9 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 func fullLogout() {
 	//We have been asked to shut down, lets not leave any auth tokens active
 	log.Info("Logging out of all arrays.")
-	authTokenCache.Range(func(k, v interface{}) bool {
+	clientCache.Range(func(k, v interface{}) bool {
 		log.Debugf("Logging out of array: %v", k)
-		c := ecsclient.EcsClient{
-			UserName:       config.ECS.UserName,
-			Password:       config.ECS.Password,
-			ClusterAddress: k.(string),
-			AuthToken:      v.(string),
-		}
+		c := v.(*ecsclient.EcsClient)
 		err := c.Logout()
 		if err != nil {
 			log.Debugf("Failed to log out of array: %v", k)

@@ -18,9 +18,10 @@ import (
 type EcsClient struct {
 	UserName       string
 	Password       string
-	AuthToken      string
+	authToken      string
 	ClusterAddress string
-	nodeList       []string
+	nodeListMgmtIP []string
+	nodeListDataIP []string
 	EcsVersion     string
 	ErrorCount     float64
 	httpClient     *http.Client
@@ -32,11 +33,6 @@ type NodeState struct {
 	UnknownDTnum      float64 `xml:"entry>unknown_dt_num"`
 	NodeIP            string
 	ActiveConnections float64 `xml:"entry>load_factor"`
-}
-
-type dataNodes struct {
-	DataNodes   []string
-	VersionInfo string
 }
 
 type pingList struct {
@@ -96,9 +92,46 @@ func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 		c.ErrorCount++
 		return "", fmt.Errorf("received non 200 error code: %v. the response was: %v", resp.Status, resp)
 	}
-	c.AuthToken = resp.Header.Get("X-Sds-Auth-Token")
+	c.authToken = resp.Header.Get("X-Sds-Auth-Token")
 	return resp.Header.Get("X-Sds-Auth-Token"), nil
 
+}
+
+// Login logs into the ecs cluster and retrieves and stores an auth token
+func (c *EcsClient) Login() error {
+	log.Info("Connecting to ECS Cluster: " + c.ClusterAddress)
+	var err error
+
+	for i := 1; i < 4; i++ {
+		log.Debugf("Looking to see if we have a Auth Token for %s", c.ClusterAddress)
+		if c.authToken == "" {
+			log.Debug("Authtoken not found.")
+			log.Debugf("Retrieving ECS authToken for %s", c.ClusterAddress)
+			// get our authtoken for future interactions
+			c.authToken, err = c.RetrieveAuthToken()
+			if err != nil {
+				log.Debugf("Error getting auth token for %s", c.ClusterAddress)
+				return err
+			}
+		}
+
+		log.Debugf("Authtoken pulled from cache for %s", c.ClusterAddress)
+
+		// test to make sure that our auth token is good
+		// if not delete it and loop back to our login logic above
+		validateLoginURL := "https://" + c.ClusterAddress + ":4443/user/whoami"
+		_, err = c.CallECSAPI(validateLoginURL)
+		if err == nil {
+			break
+		}
+		c.authToken = ""
+	}
+	if c.authToken == "" {
+		// we looped and failed multiple times, so no need to go further
+		log.Debugf("Error getting auth token for %s", c.ClusterAddress)
+		return fmt.Errorf("error retrieving auth token")
+	}
+	return nil
 }
 
 // Logout closes out the connection to ECS when we are done.
@@ -117,16 +150,17 @@ func (c *EcsClient) Logout() error {
 		log.Infof("Error logging out of ECS: %s", c.ClusterAddress)
 		return err
 	}
-	c.AuthToken = ""
+	c.authToken = ""
 	return nil
 }
 
+// CallECSAPI takes a string and calls the API leveraging the token we already have
 func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 
 	req, _ := http.NewRequest("GET", request, nil)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-SDS-AUTH-TOKEN", c.AuthToken)
+	req.Header.Add("X-SDS-AUTH-TOKEN", c.authToken)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Infof("\n - Error connecting to ECS: %s", err)
@@ -231,15 +265,15 @@ func (c *EcsClient) RetrieveClusterState() (EcsClusterState, error) {
 // RetrieveNodeCount returns number of nodes found in the cluster
 // since the "nodeList" is private
 func (c *EcsClient) RetrieveNodeCount() int {
-	return len(c.nodeList)
+	return len(c.nodeListMgmtIP)
 }
 
 // RetrieveNodeInfoV2 will replace RetrieveNodeInfo code, getting nodes from the object API
 // We should be able to make this a drop in replacement with just a little work.
 func (c *EcsClient) RetrieveNodeInfoV2() {
-	parsedOutput := &dataNodes{}
 
 	// Get the list of nodes from the Management API
+	// we should do this each time to ensure that we have an up to date list of the nodes
 	reqStatusURL := "https://" + c.ClusterAddress + ":4443/vdc/nodes"
 
 	s, err := c.CallECSAPI(reqStatusURL)
@@ -247,49 +281,23 @@ func (c *EcsClient) RetrieveNodeInfoV2() {
 		return
 	}
 
-	result := gjson.Get(s, "node.#.ip")
-	for _, ip := range result.Array() {
-		// according to the docs, the IP address it returns is weird
-		// eg. "10.247.179.238:11001:20069:10901", with no explination of what the other values are
-		// so we need to get just the ipv4 off the string
+	// We need to zero out the current nodeListDataIP and nodeListMgmtIP
+	// since we use append to build it back up ... if we dont this list just keeps growing
+	c.nodeListDataIP = nil
+	c.nodeListMgmtIP = nil
 
-		ipcleanup := strings.Split(ip.String(), ":")
-		parsedOutput.DataNodes = append(parsedOutput.DataNodes, ipcleanup[0])
+	resultData := gjson.Get(s, "node.#.data_ip")
+	for _, ip := range resultData.Array() {
+		// for
+		c.nodeListDataIP = append(c.nodeListDataIP, ip.String())
+	}
+	resultMgmt := gjson.Get(s, "node.#.mgmt_ip")
+	for _, ip := range resultMgmt.Array() {
+		// for
+		c.nodeListMgmtIP = append(c.nodeListMgmtIP, ip.String())
 	}
 
-	c.nodeList = parsedOutput.DataNodes
 	c.EcsVersion = gjson.Get(s, "node.0.version").String()
-
-}
-
-// RetrieveNodeInfo will retrieve a list of individual nodes in the cluster
-// this is used to pull DTstats later on
-func (c *EcsClient) RetrieveNodeInfo() {
-	parsedOutput := &dataNodes{}
-	// ECS gives you a way to get the node IPs, BUT it wont do it without a namespace
-	// Interestingly you can give it ANY namespace, including ones that dont exist
-	reqStatusURL := "https://" + c.ClusterAddress + ":9021/?endpoint"
-	log.Debug("node ip url is: " + reqStatusURL)
-
-	req, _ := http.NewRequest("GET", reqStatusURL, nil)
-	req.Header.Set("x-emc-namespace", "nodeips")
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		log.Info("Error connecting to ECS Cluster at: " + reqStatusURL)
-		c.nodeList = nil
-		c.EcsVersion = ""
-		c.ErrorCount++
-		return
-	}
-	defer resp.Body.Close()
-
-	bytes, _ := ioutil.ReadAll(resp.Body)
-
-	log.Debugf("Output from node poll is %s", bytes)
-	xml.Unmarshal(bytes, parsedOutput)
-	c.nodeList = parsedOutput.DataNodes
-	c.EcsVersion = parsedOutput.VersionInfo
 
 }
 
@@ -302,7 +310,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	reqStatusURL := "http://" + node + ":9101/stats/dt/DTInitStat"
 	log.Debug("URL we are checking is ", reqStatusURL)
 
-	resp, err := http.Get(reqStatusURL)
+	resp, err := c.httpClient.Get(reqStatusURL)
 	if err != nil {
 		log.Info("Error connecting to ECS Cluster at: " + reqStatusURL)
 		c.ErrorCount++
@@ -320,9 +328,10 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	reqConnectionsURL := "https://" + node + ":9021/?ping"
 	log.Debug("URL we are checking for connections is ", reqConnectionsURL)
 
-	respConn, err := http.Get(reqConnectionsURL)
+	respConn, err := c.httpClient.Get(reqConnectionsURL)
 	if err != nil {
-		log.Info("Error connecting to ECS Cluster at: " + reqStatusURL)
+		log.Info("Error connecting to ECS Cluster at: " + reqConnectionsURL)
+		log.Info(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -342,11 +351,11 @@ func (c *EcsClient) RetrieveNodeStateParallel() []NodeState {
 
 	ch := make(chan NodeState)
 
-	for _, node := range c.nodeList {
+	for _, node := range c.nodeListMgmtIP {
 		go c.retrieveNodeState(node, ch)
 	}
 
-	for range c.nodeList {
+	for range c.nodeListMgmtIP {
 		NodeStates = append(NodeStates, <-ch)
 	}
 	return NodeStates
