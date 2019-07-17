@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,15 +19,13 @@ import (
 
 // EcsClient is used to persist connection to an ECS Cluster
 type EcsClient struct {
-	UserName       string
-	Password       string
 	authToken      string
 	ClusterAddress string
 	nodeListMgmtIP []string
 	nodeListDataIP []string
 	EcsVersion     string
 	ErrorCount     float64
-	Config         ecsconfig.Config
+	Config         *ecsconfig.Config
 	httpClient     *http.Client
 }
 
@@ -46,10 +45,8 @@ type pingList struct {
 	Text   []string `xml:"PingItem>Text"`
 }
 
-func NewECSClient(userName string, password string, clusterAddress string, ecsconfig *ecsconfig.Config) *EcsClient {
+func NewECSClient(clusterAddress string, ecsconfig *ecsconfig.Config) *EcsClient {
 	return &EcsClient{
-		UserName:       userName,
-		Password:       password,
 		ClusterAddress: clusterAddress,
 		httpClient: &http.Client{Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -65,17 +62,18 @@ func NewECSClient(userName string, password string, clusterAddress string, ecsco
 			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		},
 			Timeout: 60 * time.Second},
+		Config: ecsconfig,
 	}
 }
 
 // RetrieveAuthToken and store as part of the client struct for future use
 func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
-	reqLoginURL := "https://" + c.ClusterAddress + ":4443/login"
+	reqLoginURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/login"
 
-	log.Debugf("Using the following info to log into the ECS, username: %v, URL: %v", c.UserName, c.ClusterAddress)
+	log.Debugf("Using the following info to log into the ECS, username: %v, URL: %v", c.Config.ECS.UserName, c.ClusterAddress)
 
 	req, _ := http.NewRequest("GET", reqLoginURL, nil)
-	req.SetBasicAuth(c.UserName, c.Password)
+	req.SetBasicAuth(c.Config.ECS.UserName, c.Config.ECS.Password)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		log.Infof("\n - Error connecting to ECS: %s", err)
@@ -122,7 +120,7 @@ func (c *EcsClient) Login() error {
 
 		// test to make sure that our auth token is good
 		// if not delete it and loop back to our login logic above
-		validateLoginURL := "https://" + c.ClusterAddress + ":4443/user/whoami"
+		validateLoginURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/user/whoami"
 		_, err = c.CallECSAPI(validateLoginURL)
 		if err == nil {
 			break
@@ -145,15 +143,32 @@ func (c *EcsClient) Logout() error {
 	// there’s a maximum number of login tokens (100) per user
 	// need to log out to throw away the token since we arent set up for caching...
 
-	reqLogoutURL := "https://" + c.ClusterAddress + ":4443/logout"
+	request := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/logout"
 
 	log.Infof("Logging out of %s", c.ClusterAddress)
 
-	// we dont need the reply data, so just throw it away
-	_, err := c.CallECSAPI(reqLogoutURL)
+	req, _ := http.NewRequest("GET", request, nil)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-SDS-AUTH-TOKEN", c.authToken)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Infof("Error logging out of ECS: %s", c.ClusterAddress)
-		return err
+		log.Infof("\n - Error connecting to ECS: %s", err)
+		return fmt.Errorf("error connecting to : %v. the error was: %v", request, err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case 401:
+		// this just means we are already logged out.
+		log.Infof("Already logged out of %s.", c.ClusterAddress)
+	case 200:
+		// we have succesfully logged out.
+		log.Infof("Logged out of %s.", c.ClusterAddress)
+	default:
+		log.Infof("Got error code: %v while logging out of %s", resp.StatusCode, c.ClusterAddress)
+		c.authToken = ""
+		return fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 	}
 	c.authToken = ""
 	return nil
@@ -178,11 +193,15 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	switch resp.StatusCode {
 	case 401:
 		// this just means we need to re-login so we will log in and then re-make the call
+		// invalidate the authToken
+		log.Debug("Got a 401 from ECS. Invalidating apiToken")
+		c.authToken = ""
 		err = c.Login()
 		if err != nil {
 			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
 			return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 		}
+		log.Debug("Should be all logged back in. Recursively re-calling API")
 		return c.CallECSAPI(request)
 	case 200:
 		return s, nil
@@ -196,7 +215,7 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 // RetrieveReplState will return a struct containing the state of the ECS cluster on query
 func (c *EcsClient) RetrieveReplState() (EcsReplState, error) {
 	// this will only pull the current stats, which is what we want for this application
-	reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone/replicationgroups?dataType=current"
+	reqStatusURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/dashboard/zones/localzone/replicationgroups?dataType=current"
 
 	s, err := c.CallECSAPI(reqStatusURL)
 	if err != nil {
@@ -218,8 +237,8 @@ func (c *EcsClient) RetrieveReplState() (EcsReplState, error) {
 func (c *EcsClient) RetrieveClusterState() (EcsClusterState, error) {
 
 	// this will only pull the current stats, which is what we want for this application
-	// reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone?dataType=current"
-	reqStatusURL := "https://" + c.ClusterAddress + ":4443/dashboard/zones/localzone"
+	// reqStatusURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/dashboard/zones/localzone?dataType=current"
+	reqStatusURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/dashboard/zones/localzone"
 
 	s, err := c.CallECSAPI(reqStatusURL)
 	if err != nil {
@@ -285,7 +304,7 @@ func (c *EcsClient) RetrieveNodeInfoV2() {
 
 	// Get the list of nodes from the Management API
 	// we should do this each time to ensure that we have an up to date list of the nodes
-	reqStatusURL := "https://" + c.ClusterAddress + ":4443/vdc/nodes"
+	reqStatusURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/vdc/nodes"
 
 	s, err := c.CallECSAPI(reqStatusURL)
 	if err != nil {
@@ -343,7 +362,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	// ECS supplies the current number of active connections, but its per node
 	// and its part of the s3 retrieval api (ie port 9021) so lets get this and pass it along as well
 	// and its in yet another format ... or at least xml layed out differently, so more processing is needed
-	reqConnectionsURL := "https://" + node + ":9021/?ping"
+	reqConnectionsURL := "https://" + node + ":" + strconv.Itoa(c.Config.ECS.ObjPort) + "/?ping"
 	log.Debug("URL we are checking for connections is ", reqConnectionsURL)
 
 	respConn, err := c.httpClient.Get(reqConnectionsURL)

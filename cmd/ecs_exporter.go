@@ -142,7 +142,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// We did not have a client cached. We need to create one and store it
 		log.Debugf("Creating new ECS Client for %s", target)
-		c := ecsclient.NewECSClient(config.ECS.UserName, config.ECS.Password, target, config)
+		c := ecsclient.NewECSClient(target, config)
 
 		err := c.Login()
 		if err != nil {
