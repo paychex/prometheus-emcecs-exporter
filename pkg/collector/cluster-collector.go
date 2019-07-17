@@ -5,7 +5,7 @@ import (
 
 	"github.com/paychex/prometheus-emcecs-exporter/pkg/ecsclient"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // A EcsClusterCollector implements the prometheus.Collector.

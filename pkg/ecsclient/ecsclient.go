@@ -11,7 +11,8 @@ import (
 	"time"
 
 	ecsconfig "github.com/paychex/prometheus-emcecs-exporter/pkg/config"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/tidwall/gjson"
 )
 
@@ -126,6 +127,8 @@ func (c *EcsClient) Login() error {
 		if err == nil {
 			break
 		}
+		// authToken we have cached is no good. blank it out and try again
+		log.Info("AuthToken has expired. Invalidating and logging back in.")
 		c.authToken = ""
 	}
 	if c.authToken == "" {
@@ -173,12 +176,8 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	s := string(respText)
 
 	switch resp.StatusCode {
-	case 401, 302:
-		err := c.Logout()
-		if err != nil {
-			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
-			return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
-		}
+	case 401:
+		// this just means we need to re-login so we will log in and then re-make the call
 		err = c.Login()
 		if err != nil {
 			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)

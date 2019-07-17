@@ -20,7 +20,7 @@ import (
 	"github.com/paychex/prometheus-emcecs-exporter/pkg/ecsclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 )
 
 var (
-	log    = logrus.New()
+	// log    = logrus.New()
 	ecsURL string
 	config *ecsconfig.Config
 
@@ -73,7 +73,7 @@ var (
 )
 
 func init() {
-	log.Formatter = new(logrus.TextFormatter)
+	log.SetFormatter(&log.TextFormatter{})
 
 	//
 	ecsCollectionBuildInfo.WithLabelValues(version, commit, runtime.Version()).Set(1)
@@ -221,11 +221,11 @@ func fullLogout() {
 func main() {
 
 	if config.Exporter.Debug {
-		log.Level = logrus.DebugLevel
+		log.SetLevel(log.DebugLevel)
 		log.Debug("Setting logging to debug level.")
 	} else {
 		log.Info("Logging set to standard level.")
-		log.Level = logrus.InfoLevel
+		log.SetLevel(log.InfoLevel)
 	}
 
 	// enable signal trapping to ensure clean shutdown
