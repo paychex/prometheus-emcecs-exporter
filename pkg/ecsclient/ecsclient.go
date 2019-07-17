@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	ecsconfig "github.com/paychex/prometheus-emcecs-exporter/pkg/config"
 	"github.com/prometheus/common/log"
 	"github.com/tidwall/gjson"
 )
@@ -24,6 +25,7 @@ type EcsClient struct {
 	nodeListDataIP []string
 	EcsVersion     string
 	ErrorCount     float64
+	Config         ecsconfig.Config
 	httpClient     *http.Client
 }
 
@@ -43,7 +45,7 @@ type pingList struct {
 	Text   []string `xml:"PingItem>Text"`
 }
 
-func NewECSClient(userName, password, clusterAddress string) *EcsClient {
+func NewECSClient(userName string, password string, clusterAddress string, ecsconfig *ecsconfig.Config) *EcsClient {
 	return &EcsClient{
 		UserName:       userName,
 		Password:       password,

@@ -16,7 +16,6 @@ type ecsConfig struct {
 type exporterConfig struct {
 	BindAddress string
 	BindPort    int
-	Multiconfig bool
 	Debug       bool
 }
 
