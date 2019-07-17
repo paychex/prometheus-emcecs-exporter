@@ -3,7 +3,7 @@
 [![Build Status](https://api.travis-ci.com/paychex/prometheus-emcecs-exporter.svg?branch=master)](https://travis-ci.com/paychex/prometheus-emcecs-exporter/builds)
 [![Go Report Card](https://goreportcard.com/badge/github.com/paychex/prometheus-emcecs-exporter)](https://goreportcard.com/report/github.com/paychex/prometheus-emcecs-exporter)
 
-This exporter collects performance and metrics stats from Dell EMC ECS clusters running version 3.x and above and makes it available for Prometheus to scrape.  It is not recommended that you run this tool on the Dell EMC ECS Cluster node(s), instead it should be run on a separate machine.  The application can be configured to monitor just one cluster, or can be configured to query multiple Dell EMC ECS clusters.  See configuration options below for how to use this tool.
+This exporter collects performance and metrics stats from Dell EMC ECS clusters running version 3.x and above and makes it available for Prometheus to scrape. It is not recommended that you run this tool on the Dell EMC ECS Cluster node(s), instead it should be run on a separate machine. The application can be configured to monitor just one cluster, or can be configured to query multiple Dell EMC ECS clusters. See configuration options below for how to use this tool.
 
 ## Usage
 
@@ -27,7 +27,7 @@ The following ports need to be open between the ECS array and the exporter:
 
 ### Running in multi-query mode
 
-While normally one runs one exporter per device, this exporter works a little different.  The exporter is designed to work by default in a "multi-query" mode.  This setup works similar to the [SNMP exporter](https://github.com/prometheus/snmp_exporter).  Note that you will need to configure each ECS cluster to use the same username and password for this to work properly.  You can still monitor just one array if you so choose, its just a few extra lines in your Prometheus config file.
+While normally one runs one exporter per device, this exporter works a little different. The exporter is designed to work by default in a "multi-query" mode. This setup works similar to the [SNMP exporter](https://github.com/prometheus/snmp_exporter).  Note that you will need to configure each ECS cluster to use the same username and password for this to work properly. You can still monitor just one array if you so choose, its just a few extra lines in your Prometheus config file.
 
 When configuring Prometheus to scrape in this manner use the following Prometheus config snippet:
 
@@ -70,7 +70,7 @@ scrape_configs:
 
 ## Exported Metrics
 
-This exporter exports information in two ways.  The first is a standard export of performance and system health stats.  Additionally you can get an export of metering metrics (for now just quota usage/space usage).  This is done by specifying an additional option "metering=1" on the query and you will get back a set of stats on namespace usage.  This query can take a long time, and does not need to be done at quite as high a frequency as performance stats.  It is suggested polling this on a 5 minute or higher frequency due to the rate of change being much lower in most cases.
+This exporter exports information in two ways. The first is a standard export of performance and system health stats.  Additionally you can get an export of metering metrics (for now just quota usage/space usage). This is done by specifying an additional option "metering=1" on the query and you will get back a set of stats on namespace usage. This query can take a long time, and does not need to be done at quite as high a frequency as performance stats. It is suggested polling this on a 5 minute or higher frequency due to the rate of change being much lower in most cases.
 
 ### Dell EMC ECS Performance Stats
 
@@ -163,7 +163,7 @@ The following items are presented on the /metrics endpoint which gives the prome
 
 ## Building
 
-This exporter can run on any go supported platform.  As of version 1.2 we have moved to using Go 1.11 and higher. Testing is done with Go 1.12 but go 1.11 should work for anyone using it.
+This exporter can run on any go supported platform. As of version 1.2 we have moved to using Go 1.11 and higher. Testing is done with Go 1.12 but go 1.11 should work for anyone using it.
 
 To build run:
 `go build`

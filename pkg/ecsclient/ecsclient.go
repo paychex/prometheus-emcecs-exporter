@@ -170,11 +170,26 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	respText, err := ioutil.ReadAll(resp.Body)
 	s := string(respText)
 
-	if resp.StatusCode != 200 {
+	switch resp.StatusCode {
+	case 401, 302:
+		err := c.Logout()
+		if err != nil {
+			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
+			return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
+		}
+		err = c.Login()
+		if err != nil {
+			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
+			return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
+		}
+		return c.CallECSAPI(request)
+	case 200:
+		return s, nil
+	default:
 		log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
 		return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 	}
-	return s, nil
+
 }
 
 // RetrieveReplState will return a struct containing the state of the ECS cluster on query
@@ -241,12 +256,7 @@ func (c *EcsClient) RetrieveClusterState() (EcsClusterState, error) {
 		// it would be better if this was two fields, so we can break out counts for Protocol
 		// or for error codes.  So we need to do some string manipulation
 		errorType := strings.Fields(gjson.Get(value.String(), "errorType").String())
-		// fmt.Println("Code: ", errorType[0])
-		// I am sure there is a better way to do this but
 		s := errorType[1]
-		//fmt.Println("Proto: ", s[1:len(s)-1])
-		//fmt.Println(gjson.Get(value.String(), "category"))
-		//fmt.Println(gjson.Get(value.String(), "errorCount"))
 
 		transactionerror := EcsTransactionError{
 			ErrorCode:  errorType[0],
@@ -320,7 +330,14 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	defer resp.Body.Close()
 
 	bytes, _ := ioutil.ReadAll(resp.Body)
-	xml.Unmarshal(bytes, parsedOutput)
+	err = xml.Unmarshal(bytes, parsedOutput)
+	if err != nil {
+		log.Info("Error un-marshaling XML from: " + reqStatusURL)
+		log.Info(err)
+		c.ErrorCount++
+		ch <- *parsedOutput
+		return
+	}
 
 	// ECS supplies the current number of active connections, but its per node
 	// and its part of the s3 retrieval api (ie port 9021) so lets get this and pass it along as well
@@ -339,7 +356,14 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	defer respConn.Body.Close()
 
 	bytesConnection, _ := ioutil.ReadAll(respConn.Body)
-	xml.Unmarshal(bytesConnection, parsedPing)
+	err = xml.Unmarshal(bytesConnection, parsedPing)
+	if err != nil {
+		log.Info("Error un-marshaling XML from: " + reqConnectionsURL)
+		log.Info(err)
+		c.ErrorCount++
+		ch <- *parsedOutput
+		return
+	}
 	parsedOutput.ActiveConnections = parsedPing.Value
 
 	ch <- *parsedOutput

@@ -64,7 +64,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 		// since we need this a few times, lets get the name once
 		ns := name.String()
 
-		// ensuring we dont overload the ECS with mulitple calls, so we are limiting concurency to 4
+		// ensuring we don't overload the ECS with multiple calls, so we are limiting concurency to 4
 		sem <- true
 		go func() {
 			defer func() { <-sem }()
@@ -87,7 +87,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 		sem <- true
 	}
 	duration := float64(time.Since(start).Seconds())
-	log.Infof("Scrape of metering took %f seconds for cluster %s", duration, e.ecsClient.ClusterAddress)
+	log.Infof("Scrape of metering took %f seconds for cluster %s\n", duration, e.ecsClient.ClusterAddress)
 	log.Infoln("Metering exporter finished")
 }
 

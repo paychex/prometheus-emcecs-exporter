@@ -34,7 +34,6 @@ var (
 	listenAddress = flag.String("bind_address", "localhost", "Exporter bind address")
 	listenPort    = flag.Int("bind_port", 9438, "Exporter bind port")
 	debugLevel    = flag.Bool("debug", false, "enable  debug messages")
-	// multiQuery    = flag.Bool("multi", false, "Enable query endpoint")
 )
 
 func init() {
