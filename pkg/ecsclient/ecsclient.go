@@ -76,7 +76,7 @@ func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 	req.SetBasicAuth(c.Config.ECS.UserName, c.Config.ECS.Password)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Infof("\n - Error connecting to ECS: %s", err)
+		log.Errorf("\n - Error connecting to ECS: %s", err)
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -88,7 +88,7 @@ func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 
 	if resp.StatusCode != 200 {
 		// we didnt get a good response code, so bailing out
-		log.Infoln("Got a non 200 response code: ", resp.StatusCode)
+		log.Errorln("Got a non 200 response code: ", resp.StatusCode)
 		log.Debugln("response was: ", resp)
 		c.ErrorCount++
 		return "", fmt.Errorf("received non 200 error code: %v. the response was: %v", resp.Status, resp)
@@ -342,7 +342,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 
 	resp, err := c.httpClient.Get(reqStatusURL)
 	if err != nil {
-		log.Info("Error connecting to ECS Cluster at: " + reqStatusURL)
+		log.Error("Error connecting to ECS Cluster at: " + reqStatusURL)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -352,8 +352,8 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	bytes, _ := ioutil.ReadAll(resp.Body)
 	err = xml.Unmarshal(bytes, parsedOutput)
 	if err != nil {
-		log.Info("Error un-marshaling XML from: " + reqStatusURL)
-		log.Info(err)
+		log.Error("Error un-marshaling XML from: " + reqStatusURL)
+		log.Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -367,8 +367,8 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 
 	respConn, err := c.httpClient.Get(reqConnectionsURL)
 	if err != nil {
-		log.Info("Error connecting to ECS Cluster at: " + reqConnectionsURL)
-		log.Info(err)
+		log.Error("Error connecting to ECS Cluster at: " + reqConnectionsURL)
+		log.Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -378,8 +378,8 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	bytesConnection, _ := ioutil.ReadAll(respConn.Body)
 	err = xml.Unmarshal(bytesConnection, parsedPing)
 	if err != nil {
-		log.Info("Error un-marshaling XML from: " + reqConnectionsURL)
-		log.Info(err)
+		log.Error("Error un-marshaling XML from: " + reqConnectionsURL)
+		log.Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -403,4 +403,10 @@ func (c *EcsClient) RetrieveNodeStateParallel() []NodeState {
 		NodeStates = append(NodeStates, <-ch)
 	}
 	return NodeStates
+}
+
+// Zero out the error count for this client. This should be called after we have recorded any existing error count
+func (c *EcsClient) ZeroErrorCount() {
+	log.Debug("Zeroing out client error count")
+	c.ErrorCount = 0
 }

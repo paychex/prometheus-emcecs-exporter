@@ -48,7 +48,7 @@ var (
 // NewEcsReplCollector returns an initialized Cluster Replication Collector.
 func NewEcsReplCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsReplCollector, error) {
 
-	log.Debugln("Init exporter")
+	log.Debugln("Init Replication exporter")
 	return &EcsReplCollector{
 		ecsClient: emcecs,
 		namespace: namespace,

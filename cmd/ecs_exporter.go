@@ -20,6 +20,7 @@ import (
 	"github.com/paychex/prometheus-emcecs-exporter/pkg/ecsclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,7 +74,11 @@ var (
 )
 
 func init() {
-	log.SetFormatter(&log.TextFormatter{})
+	customFormatter := new(logrus.TextFormatter)
+	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
+	customFormatter.FullTimestamp = true
+
+	log.SetFormatter(customFormatter)
 
 	//
 	ecsCollectionBuildInfo.WithLabelValues(version, commit, runtime.Version()).Set(1)
@@ -114,6 +119,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	target := r.URL.Query().Get("target")
 	if target == "" {
 		log.Info("'target' parameter must be specified")
+		log.Info("incrementing requests errors by 1")
 		ecsCollectionRequestErrors.Inc()
 		ecsCollectionSuccess.WithLabelValues("NULL").Set(0)
 		h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
@@ -128,6 +134,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := net.LookupHost(target)
 	if err != nil {
 		log.Infof("target: %s is not a valid host.\n error was: %v", target, err)
+		log.Info("incrementing requests errors by 1")
 		ecsCollectionRequestErrors.Inc()
 		ecsCollectionSuccess.WithLabelValues(target).Set(0)
 		h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
@@ -147,6 +154,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 		err := c.Login()
 		if err != nil {
 			log.Infof("target: %s could not be logged into, the error was %s", target, err)
+			log.Info("incrementing requests errors by 1")
 			ecsCollectionRequestErrors.Inc()
 			ecsCollectionSuccess.WithLabelValues(target).Set(0)
 			h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
@@ -199,7 +207,10 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delegate http serving to Promethues client library, which will call collector.Collect.
+	log.Infof("incrementing requests errors by %v\n", c.ErrorCount)
 	ecsCollectionRequestErrors.Add(c.ErrorCount)
+	// we have recorded this round of errors zero out the errorCount before moving on
+	c.ZeroErrorCount()
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	h.ServeHTTP(w, r)
 }

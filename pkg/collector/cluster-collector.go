@@ -130,7 +130,7 @@ var (
 // NewEcsClusterCollector returns an initialized Node DT Collector.
 func NewEcsClusterCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsClusterCollector, error) {
 
-	log.Debugln("Init exporter")
+	log.Debugln("Init Cluster exporter")
 	return &EcsClusterCollector{
 		ecsClient: emcecs,
 		namespace: namespace,

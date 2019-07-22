@@ -38,7 +38,7 @@ var (
 // NewEcsNodeDTCollector returns an initialized Node DT Collector.
 func NewEcsNodeDTCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsNodeDTCollector, error) {
 
-	log.Debugln("Init exporter")
+	log.Debugln("Init Node exporter")
 	return &EcsNodeDTCollector{
 		ecsClient: emcecs,
 		namespace: namespace,
