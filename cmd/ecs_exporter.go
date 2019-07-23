@@ -167,7 +167,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 	c := result.(*ecsclient.EcsClient)
 
 	c.RetrieveNodeInfoV2()
-	log.WithFields(log.Fields{"package": "main", "cluster_version": c.EcsVersion, "node_count": c.RetrieveNodeCount}).Debugf("ECS Cluster Info.")
+	log.WithFields(log.Fields{"package": "main", "cluster_version": c.EcsVersion, "node_count": c.RetrieveNodeCount()}).Debugf("ECS Cluster Info.")
 	ecsClusterInfo.WithLabelValues(c.EcsVersion, strconv.Itoa(c.RetrieveNodeCount())).Set(1)
 
 	if r.URL.Query().Get("metering") == "1" {
@@ -206,7 +206,7 @@ func queryHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Delegate http serving to Promethues client library, which will call collector.Collect.
 	log.WithFields(log.Fields{"package": "main"}).Debugf("incrementing requests errors by %v\n", c.ErrorCount)
-	ecsCollectionRequestErrors.Add(c.ErrorCount)
+	ecsCollectionRequestErrors.Add(float64(c.ErrorCount))
 	// we have recorded this round of errors zero out the errorCount before moving on
 	c.ZeroErrorCount()
 	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})

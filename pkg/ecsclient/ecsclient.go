@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	ecsconfig "github.com/paychex/prometheus-emcecs-exporter/pkg/config"
@@ -24,7 +25,7 @@ type EcsClient struct {
 	nodeListMgmtIP []string
 	nodeListDataIP []string
 	EcsVersion     string
-	ErrorCount     float64
+	ErrorCount     int64
 	Config         *ecsconfig.Config
 	httpClient     *http.Client
 }
@@ -343,7 +344,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	resp, err := c.httpClient.Get(reqStatusURL)
 	if err != nil {
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error connecting to ECS Cluster at: " + reqStatusURL)
-		c.ErrorCount++
+		atomic.AddInt64(&c.ErrorCount, 1)
 		ch <- *parsedOutput
 		return
 	}
@@ -354,7 +355,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	if err != nil {
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error un-marshaling XML from: " + reqStatusURL)
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
-		c.ErrorCount++
+		atomic.AddInt64(&c.ErrorCount, 1)
 		ch <- *parsedOutput
 		return
 	}
@@ -369,7 +370,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	if err != nil {
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error connecting to ECS Cluster.")
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
-		c.ErrorCount++
+		atomic.AddInt64(&c.ErrorCount, 1)
 		ch <- *parsedOutput
 		return
 	}
@@ -380,7 +381,7 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	if err != nil {
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error un-marshaling XML from: " + reqConnectionsURL)
 		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
-		c.ErrorCount++
+		atomic.AddInt64(&c.ErrorCount, 1)
 		ch <- *parsedOutput
 		return
 	}
@@ -405,8 +406,8 @@ func (c *EcsClient) RetrieveNodeStateParallel() []NodeState {
 	return NodeStates
 }
 
-// Zero out the error count for this client. This should be called after we have recorded any existing error count
+// ZeroErrorCount resets the error count for this client. This should be called after we have recorded any existing error count
 func (c *EcsClient) ZeroErrorCount() {
 	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("Zeroing out client error count")
-	c.ErrorCount = 0
+	atomic.StoreInt64(&c.ErrorCount, 0)
 }
