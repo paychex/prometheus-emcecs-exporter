@@ -32,7 +32,7 @@ var (
 // NewEcsMeteringCollector returns an initialized Metering Collector.
 func NewEcsMeteringCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsMeteringCollector, error) {
 
-	log.Debugln("Init Metering exporter")
+	log.WithFields(log.Fields{"package": "metering-collector"}).Debug("Init Metering exporter")
 	return &EcsMeteringCollector{
 		ecsClient: emcecs,
 		namespace: namespace,
@@ -42,9 +42,9 @@ func NewEcsMeteringCollector(emcecs *ecsclient.EcsClient, namespace string) (*Ec
 // Collect fetches the metering information such as quota and usage from the cluster
 // It implements prometheus.Collector.
 func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
-	log.Debugln("ECS Metering collect starting")
+	log.WithFields(log.Fields{"package": "metering-collector"}).Debug("ECS Metering collect starting")
 	if e.ecsClient == nil {
-		log.Errorf("ECS client not configured.")
+		log.WithFields(log.Fields{"package": "metering-collector"}).Error("ECS client not configured.")
 		return
 	}
 	start := time.Now()
@@ -52,7 +52,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 	nameSpaceReq := "https://" + e.ecsClient.ClusterAddress + ":4443/object/namespaces"
 	n, err := e.ecsClient.CallECSAPI(nameSpaceReq)
 	if err != nil {
-		log.Errorf("Error getting metering info: %s", err)
+		log.WithFields(log.Fields{"package": "metering-collector"}).Errorf("Error getting metering info: %s", err)
 		return
 	}
 
@@ -76,7 +76,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 			namespaceInfoReq := "https://" + e.ecsClient.ClusterAddress + ":4443/object/namespaces/namespace/" + ns + "/quota"
 			n, err := e.ecsClient.CallECSAPI(namespaceInfoReq)
 			if err != nil {
-				log.Errorf("Error getting metering info quota: %s", err)
+				log.WithFields(log.Fields{"package": "metering-collector"}).Errorf("Error getting metering info quota: %s", err)
 				return
 			}
 			if gjson.Get(n, "blockSize").Float() > 0 {
@@ -87,7 +87,7 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 			namespaceInfoReq = "https://" + e.ecsClient.ClusterAddress + ":4443/object/billing/namespace/" + ns + "/info?sizeunit=KB"
 			n, err = e.ecsClient.CallECSAPI(namespaceInfoReq)
 			if err != nil {
-				log.Errorf("Error getting metering info quota: %s", err)
+				log.WithFields(log.Fields{"package": "metering-collector"}).Errorf("Error getting metering info quota: %s", err)
 				return
 			}
 			ch <- prometheus.MustNewConstMetric(nameSpaceObjectTotal, prometheus.GaugeValue, gjson.Get(n, "total_objects").Float(), ns)
@@ -99,8 +99,8 @@ func (e *EcsMeteringCollector) Collect(ch chan<- prometheus.Metric) {
 		sem <- true
 	}
 	duration := float64(time.Since(start).Seconds())
-	log.Infof("Scrape of metering took %f seconds for cluster %s\n", duration, e.ecsClient.ClusterAddress)
-	log.Infoln("Metering exporter finished")
+	log.WithFields(log.Fields{"package": "metering-collector"}).Debugf("Scrape of metering took %f seconds for cluster %s\n", duration, e.ecsClient.ClusterAddress)
+	log.WithFields(log.Fields{"package": "metering-collector"}).Debug("Metering exporter finished")
 }
 
 // Describe describes the metrics exported from this collector.

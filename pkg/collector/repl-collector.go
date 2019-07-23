@@ -48,7 +48,7 @@ var (
 // NewEcsReplCollector returns an initialized Cluster Replication Collector.
 func NewEcsReplCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsReplCollector, error) {
 
-	log.Debugln("Init Replication exporter")
+	log.WithFields(log.Fields{"package": "repl-collector"}).Debug("Init Replication exporter")
 	return &EcsReplCollector{
 		ecsClient: emcecs,
 		namespace: namespace,
@@ -58,15 +58,15 @@ func NewEcsReplCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsRep
 // Collect fetches the stats from configured ECS cluster as Prometheus metrics.
 // It implements prometheus.Collector.
 func (e *EcsReplCollector) Collect(ch chan<- prometheus.Metric) {
-	log.Debugln("ECS Replication state collect starting")
+	log.WithFields(log.Fields{"package": "repl-collector"}).Debug("ECS Replication state collect starting")
 	if e.ecsClient == nil {
-		log.Errorf("ECS client not configured.")
+		log.WithFields(log.Fields{"package": "repl-collector"}).Error("ECS client not configured.")
 		return
 	}
 
 	replState, err := e.ecsClient.RetrieveReplState()
 	if err != nil {
-		log.Error("Replication exporter received no info from array.")
+		log.WithFields(log.Fields{"package": "repl-collector"}).Error("Replication exporter received no info from array.")
 		return
 	}
 
@@ -77,8 +77,8 @@ func (e *EcsReplCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(chunkspendingxor, prometheus.GaugeValue, replState.ChunksPendingXorTotalSize, replState.RgName)
 	ch <- prometheus.MustNewConstMetric(replicationtimestamp, prometheus.CounterValue, replState.ReplicationRpoTimestamp, replState.RgName)
 
-	log.Infoln("Replication exporter finished")
-	log.Debugln(replState)
+	log.WithFields(log.Fields{"package": "repl-collector"}).Debug("Replication exporter finished")
+	log.WithFields(log.Fields{"package": "repl-collector"}).Debug(replState)
 }
 
 // Describe describes the metrics exported from this collector.

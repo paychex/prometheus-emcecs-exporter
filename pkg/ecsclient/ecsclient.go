@@ -70,26 +70,26 @@ func NewECSClient(clusterAddress string, ecsconfig *ecsconfig.Config) *EcsClient
 func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 	reqLoginURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/login"
 
-	log.Debugf("Using the following info to log into the ECS, username: %v, URL: %v", c.Config.ECS.UserName, c.ClusterAddress)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Using the following info to log into the ECS, username: %v, URL: %v", c.Config.ECS.UserName, c.ClusterAddress)
 
 	req, _ := http.NewRequest("GET", reqLoginURL, nil)
 	req.SetBasicAuth(c.Config.ECS.UserName, c.Config.ECS.Password)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Errorf("\n - Error connecting to ECS: %s", err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Errorf("Error connecting to ECS: %s", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	log.Debugf("Response Status Code: %v", resp.StatusCode)
-	log.Debugf("Response Status: %v", resp.Status)
-	log.Debugf("Response Body: %v", resp.Body)
-	log.Debugf("AuthToken is: %v", resp.Header.Get("X-Sds-Auth-Token"))
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Response Status Code: %v", resp.StatusCode)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Response Status: %v", resp.Status)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Response Body: %v", resp.Body)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("AuthToken is: %v", resp.Header.Get("X-Sds-Auth-Token"))
 
 	if resp.StatusCode != 200 {
 		// we didnt get a good response code, so bailing out
-		log.Errorln("Got a non 200 response code: ", resp.StatusCode)
-		log.Debugln("response was: ", resp)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Errorln("Got a non 200 response code: ", resp.StatusCode)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugln("response was: ", resp)
 		c.ErrorCount++
 		return "", fmt.Errorf("received non 200 error code: %v. the response was: %v", resp.Status, resp)
 	}
@@ -100,23 +100,23 @@ func (c *EcsClient) RetrieveAuthToken() (authToken string, err error) {
 
 // Login logs into the ecs cluster and retrieves and stores an auth token
 func (c *EcsClient) Login() error {
-	log.Info("Connecting to ECS Cluster: " + c.ClusterAddress)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Info("Connecting to ECS Cluster.")
 	var err error
 
 	for i := 1; i < 4; i++ {
-		log.Debugf("Looking to see if we have a Auth Token for %s", c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Looking for Auth Token for cluster")
 		if c.authToken == "" {
-			log.Debug("Authtoken not found.")
-			log.Debugf("Retrieving ECS authToken for %s", c.ClusterAddress)
+			log.WithFields(log.Fields{"package": "ecsclient"}).Debug("Authtoken not found.")
+			log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Retrieving ECS authToken for cluster.")
 			// get our authtoken for future interactions
 			c.authToken, err = c.RetrieveAuthToken()
 			if err != nil {
-				log.Debugf("Error getting auth token for %s", c.ClusterAddress)
+				log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Error getting auth token.")
 				return err
 			}
 		}
 
-		log.Debugf("Authtoken pulled from cache for %s", c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Authtoken pulled from cache.")
 
 		// test to make sure that our auth token is good
 		// if not delete it and loop back to our login logic above
@@ -126,12 +126,12 @@ func (c *EcsClient) Login() error {
 			break
 		}
 		// authToken we have cached is no good. blank it out and try again
-		log.Info("AuthToken has expired. Invalidating and logging back in.")
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Info("AuthToken has expired. Invalidating and logging back in.")
 		c.authToken = ""
 	}
 	if c.authToken == "" {
 		// we looped and failed multiple times, so no need to go further
-		log.Debugf("Error getting auth token for %s", c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debugf("Error getting auth token for cluster")
 		return fmt.Errorf("error retrieving auth token")
 	}
 	return nil
@@ -145,7 +145,7 @@ func (c *EcsClient) Logout() error {
 
 	request := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/logout"
 
-	log.Infof("Logging out of %s", c.ClusterAddress)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Info("Logging out of cluster.")
 
 	req, _ := http.NewRequest("GET", request, nil)
 	req.Header.Add("Accept", "application/json")
@@ -153,7 +153,7 @@ func (c *EcsClient) Logout() error {
 	req.Header.Add("X-SDS-AUTH-TOKEN", c.authToken)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Infof("\n - Error connecting to ECS: %s", err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Infof("\n - Error connecting to ECS: %s", err)
 		return fmt.Errorf("error connecting to : %v. the error was: %v", request, err)
 	}
 	defer resp.Body.Close()
@@ -161,12 +161,12 @@ func (c *EcsClient) Logout() error {
 	switch resp.StatusCode {
 	case 401:
 		// this just means we are already logged out.
-		log.Infof("Already logged out of %s.", c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Info("Already logged out of cluster.")
 	case 200:
 		// we have succesfully logged out.
-		log.Infof("Logged out of %s.", c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Info("Logged out of cluster")
 	default:
-		log.Infof("Got error code: %v while logging out of %s", resp.StatusCode, c.ClusterAddress)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress, "statuscode": resp.StatusCode}).Info("Received error while logging out of cluster.")
 		c.authToken = ""
 		return fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 	}
@@ -183,7 +183,7 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	req.Header.Add("X-SDS-AUTH-TOKEN", c.authToken)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		log.Infof("\n - Error connecting to ECS: %s", err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Infof("\n - Error connecting to ECS: %s", err)
 		return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, err)
 	}
 	defer resp.Body.Close()
@@ -194,19 +194,19 @@ func (c *EcsClient) CallECSAPI(request string) (response string, err error) {
 	case 401:
 		// this just means we need to re-login so we will log in and then re-make the call
 		// invalidate the authToken
-		log.Debug("Got a 401 from ECS. Invalidating apiToken")
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("Got a 401 from ECS. Invalidating apiToken")
 		c.authToken = ""
 		err = c.Login()
 		if err != nil {
-			log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
+			log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
 			return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 		}
-		log.Debug("Should be all logged back in. Recursively re-calling API")
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("Should be all logged back in. Recursively re-calling API")
 		return c.CallECSAPI(request)
 	case 200:
 		return s, nil
 	default:
-		log.Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Infof("Got error code: %v when accessing URL: %s\n Body text is: %s\n", resp.StatusCode, request, respText)
 		return "", fmt.Errorf("error connecting to : %v. the error was: %v", request, resp.StatusCode)
 	}
 
@@ -336,13 +336,13 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	parsedPing := &pingList{}
 	parsedOutput.NodeIP = node
 
-	log.Debug("this is the node I am querying ", node)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("this is the node I am querying ", node)
 	reqStatusURL := "http://" + node + ":9101/stats/dt/DTInitStat"
-	log.Debug("URL we are checking is ", reqStatusURL)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("URL we are checking is ", reqStatusURL)
 
 	resp, err := c.httpClient.Get(reqStatusURL)
 	if err != nil {
-		log.Error("Error connecting to ECS Cluster at: " + reqStatusURL)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error connecting to ECS Cluster at: " + reqStatusURL)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -352,8 +352,8 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	bytes, _ := ioutil.ReadAll(resp.Body)
 	err = xml.Unmarshal(bytes, parsedOutput)
 	if err != nil {
-		log.Error("Error un-marshaling XML from: " + reqStatusURL)
-		log.Error(err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error un-marshaling XML from: " + reqStatusURL)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -363,12 +363,12 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	// and its part of the s3 retrieval api (ie port 9021) so lets get this and pass it along as well
 	// and its in yet another format ... or at least xml layed out differently, so more processing is needed
 	reqConnectionsURL := "https://" + node + ":" + strconv.Itoa(c.Config.ECS.ObjPort) + "/?ping"
-	log.Debug("URL we are checking for connections is ", reqConnectionsURL)
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("URL we are checking for connections is ", reqConnectionsURL)
 
 	respConn, err := c.httpClient.Get(reqConnectionsURL)
 	if err != nil {
-		log.Error("Error connecting to ECS Cluster at: " + reqConnectionsURL)
-		log.Error(err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error connecting to ECS Cluster.")
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -378,8 +378,8 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	bytesConnection, _ := ioutil.ReadAll(respConn.Body)
 	err = xml.Unmarshal(bytesConnection, parsedPing)
 	if err != nil {
-		log.Error("Error un-marshaling XML from: " + reqConnectionsURL)
-		log.Error(err)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error un-marshaling XML from: " + reqConnectionsURL)
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
 		c.ErrorCount++
 		ch <- *parsedOutput
 		return
@@ -407,6 +407,6 @@ func (c *EcsClient) RetrieveNodeStateParallel() []NodeState {
 
 // Zero out the error count for this client. This should be called after we have recorded any existing error count
 func (c *EcsClient) ZeroErrorCount() {
-	log.Debug("Zeroing out client error count")
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("Zeroing out client error count")
 	c.ErrorCount = 0
 }

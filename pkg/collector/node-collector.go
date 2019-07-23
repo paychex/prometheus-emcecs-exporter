@@ -38,7 +38,7 @@ var (
 // NewEcsNodeDTCollector returns an initialized Node DT Collector.
 func NewEcsNodeDTCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsNodeDTCollector, error) {
 
-	log.Debugln("Init Node exporter")
+	log.WithFields(log.Fields{"package": "node-collector"}).Debug("Init Node exporter")
 	return &EcsNodeDTCollector{
 		ecsClient: emcecs,
 		namespace: namespace,
@@ -48,9 +48,9 @@ func NewEcsNodeDTCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsN
 // Collect fetches the stats from configured nodes as Prometheus metrics.
 // It implements prometheus.Collector.
 func (e *EcsNodeDTCollector) Collect(ch chan<- prometheus.Metric) {
-	log.Debugln("ECS Node DT collect starting")
+	log.WithFields(log.Fields{"package": "node-collector"}).Debug("ECS Node DT collect starting")
 	if e.ecsClient == nil {
-		log.Errorf("ECS client not configured.")
+		log.WithFields(log.Fields{"package": "node-collector"}).Error("ECS client not configured.")
 		return
 	}
 
@@ -63,8 +63,8 @@ func (e *EcsNodeDTCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(activeConnections, prometheus.GaugeValue, node.ActiveConnections, node.NodeIP)
 	}
 
-	log.Infoln("Nodestate exporter finished")
-	log.Debugln(nodeState)
+	log.WithFields(log.Fields{"package": "node-collector"}).Debug("Nodestate exporter finished")
+	log.WithFields(log.Fields{"package": "node-collector"}).Debug(nodeState)
 }
 
 // Describe describes the metrics exported from this collector.

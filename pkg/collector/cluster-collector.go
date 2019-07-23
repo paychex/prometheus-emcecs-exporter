@@ -130,7 +130,7 @@ var (
 // NewEcsClusterCollector returns an initialized Node DT Collector.
 func NewEcsClusterCollector(emcecs *ecsclient.EcsClient, namespace string) (*EcsClusterCollector, error) {
 
-	log.Debugln("Init Cluster exporter")
+	log.WithFields(log.Fields{"package": "cluster-collector"}).Debug("Init Cluster exporter")
 	return &EcsClusterCollector{
 		ecsClient: emcecs,
 		namespace: namespace,
@@ -140,15 +140,15 @@ func NewEcsClusterCollector(emcecs *ecsclient.EcsClient, namespace string) (*Ecs
 // Collect fetches the stats from a ECS VDC and returns them as Prometheus metrics.
 // It implements prometheus.Collector.
 func (e *EcsClusterCollector) Collect(ch chan<- prometheus.Metric) {
-	log.Debugln("ECS Cluster collect starting")
+	log.WithFields(log.Fields{"package": "cluster-collector"}).Debug("ECS Cluster collect starting")
 	if e.ecsClient == nil {
-		log.Errorf("ECS client not configured.")
+		log.WithFields(log.Fields{"package": "cluster-collector"}).Error("ECS client not configured.")
 		return
 	}
 
 	fields, err := e.ecsClient.RetrieveClusterState()
 	if err != nil {
-		log.Error("Cluster exporter received no info from array.")
+		log.WithFields(log.Fields{"package": "cluster-collector"}).Error("Cluster exporter received no info from array.")
 		return
 	}
 
@@ -179,8 +179,8 @@ func (e *EcsClusterCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(transactionerrordetail, prometheus.CounterValue, element.ErrorCount, fields.VdcName, element.ErrorCode, element.ErrorProto, strings.ToLower(element.Category))
 	}
 
-	log.Infoln("Cluster exporter finished")
-	log.Debugln(fields)
+	log.WithFields(log.Fields{"package": "cluster-collector"}).Debug("Cluster exporter finished")
+	log.WithFields(log.Fields{"package": "cluster-collector"}).Debug(fields)
 }
 
 // Describe describes the metrics exported from this collector.
