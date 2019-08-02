@@ -6,6 +6,8 @@ builds:
     main: ./cmd/ecs_exporter.go
     env:
     - CGO_ENABLED=0
+    - GOPROXY=https://proxy.golang.org
+    - GO111MODULE=on
     goos:
       - linux
       - windows
