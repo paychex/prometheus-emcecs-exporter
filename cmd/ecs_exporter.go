@@ -55,20 +55,6 @@ var (
 		[]string{"version", "commitid", "goversion"},
 	)
 
-	ecsAuthCacheCounterHit = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "emcecs_authtoken_cache_counter_hit",
-			Help: "count of authtoken cache hits",
-		},
-	)
-
-	ecsAuthCacheCounterMiss = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "emcecs_authtoken_cache_counter_miss",
-			Help: "count of authtoken cache misses",
-		},
-	)
-
 	clientCache sync.Map
 )
 
@@ -82,8 +68,6 @@ func init() {
 	//
 	ecsCollectionBuildInfo.WithLabelValues(version, commit, runtime.Version()).Set(1)
 	prometheus.MustRegister(ecsCollectionBuildInfo)
-	prometheus.MustRegister(ecsAuthCacheCounterHit)
-	prometheus.MustRegister(ecsAuthCacheCounterMiss)
 
 	// gather our configuration
 	config = ecsconfig.GetConfig()

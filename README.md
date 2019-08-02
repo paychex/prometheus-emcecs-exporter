@@ -155,10 +155,6 @@ The following items are presented on the /metrics endpoint which gives the prome
 # TYPE emcecs_collector_build_info gauge
 # HELP emcecs_request_errors_total Total errors in requests to the ECS exporter
 # TYPE emcecs_request_errors_total counter
-# HELP emcecs_authtoken_cache_counter_hit count of authtoken cache hits
-# TYPE emcecs_authtoken_cache_counter_hit counter
-# HELP emcecs_authtoken_cache_counter_miss count of authtoken cache misses
-# TYPE emcecs_authtoken_cache_counter_miss counter
 ```
 
 ## Building
