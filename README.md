@@ -25,20 +25,40 @@ The following ports need to be open between the ECS array and the exporter:
 * 9021
 * 4443
 
+### Running the Exporter
+
+The prometheus_emcecs_exporter was written to run inside Kubernetes, but that is not the only place it runs. You can run this tool as a stand alone application. You also don't need to build this tool from source. Precompiled binaries for Linux and Windows are available here: [Binary Releases](https://github.com/paychex/prometheus-emcecs-exporter/releases).
+
+Once you have downloaded the appropriate binary for your system, extract it to a known directory. Open a terminal and change to that known directory. To start the application run:
+
+`./prometheus-emcecs-exporter -username <ECS username goes here> -password <password goes here>`
+
+To test that it is working, open a web browser and point to the IP address of the host you are running the exporter on and connect to port 9438.  eg http://localhost:9438
+
+You can also define the username and password as an environment variable:
+
+```bash
+$ export ECSENV_USERNAME=<ecsusername>
+$ export ECSENV_PASSWORD=<password>
+$ ./prometheus-emcecs-exporter
+```
+
+Once you have this running, move onto the next section "Running in multi-query mode". This exporter is designed to monitor multiple ECS clusters. There is a little extra configuration required so the exporter knows what cluster (or clusters) to connect to.
+
 ### Running in multi-query mode
 
 While normally one runs one exporter per device, this exporter works a little different. The exporter is designed to work by default in a "multi-query" mode. This setup works similar to the [SNMP exporter](https://github.com/prometheus/snmp_exporter).  Note that you will need to configure each ECS cluster to use the same username and password for this to work properly. You can still monitor just one array if you so choose, its just a few extra lines in your Prometheus config file.
 
-When configuring Prometheus to scrape in this manner use the following Prometheus config snippet:
+When configuring Prometheus to scrape in this manner use the following Prometheus config snippet to build your config. When you see "127.0.0.1" substitute this with the host IP or name that is running the exporter. You do not have to specify multiple clusters, you can specify just one cluster in the targets section if you only have one.
 
 ````YAML
 scrape_configs:
   - job_name: 'emcecs'
     static_configs:
       - targets:
-        - myecsarray-1.net  # EMC ECS Cluster/VDC
-        - myecsarray-2.net  # EMC ECS Cluster/VDC
-        - myecsarray-3.net  # EMC ECS Cluster/VDC
+        - myecsarray-1.example.net  # EMC ECS Cluster/VDC
+        - myecsarray-2.example.net  # EMC ECS Cluster/VDC
+        - myecsarray-3.example.net  # EMC ECS Cluster/VDC
     metrics_path: /query
     relabel_configs:
       - source_labels: [__address__]
@@ -65,8 +85,10 @@ scrape_configs:
       - target_label: __address__
         replacement: 127.0.0.1:9438  # ECS exporter.
     static_configs:
-      - targets: ['myecsarray-1.net','myecsarray-2.net']
+      - targets: ['myecsarray-1.example.net','myecsarray-2.example.net']
 ````
+
+This exporter is used to monitor relatively small ECS clusters, you may find that gathering the data on large clusters requires changing the scrape_timeout to a number higher than default for very large clusters.
 
 ## Exported Metrics
 
@@ -161,11 +183,16 @@ The following items are presented on the /metrics endpoint which gives the prome
 
 This exporter can run on any go supported platform. As of version 1.2 we have moved to using Go 1.11 and higher. Testing is done with Go 1.12 but go 1.11 should work for anyone using it.
 
-To build run:
-`go build`
+To install from source:
+`go install github.com/paychex/prometheus-emcecs-exporter`
+This will place a freshly built binary in your $GOPATH/bin directory.
 
-You can also run:
-`go get github.com/paychex/prometheus-emcecs-exporter`
+You can also checkout the source and build:
+```bash
+$ git clone github.com/paychex/prometheus-emcecs-exporter
+$ cd prometheus-emcecs-exporter
+$ go build
+```
 
 ## Refrences
 
