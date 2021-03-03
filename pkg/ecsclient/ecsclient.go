@@ -387,6 +387,27 @@ func (c *EcsClient) retrieveNodeState(node string, ch chan<- NodeState) {
 	}
 	parsedOutput.ActiveConnections = parsedPing.Value
 
+	// Collect the cpu & memory stats from clusterAddress:MgmtPort
+	//the system stats are in among a very large payload, ?category=health&dataType=current lets us cut that down from 16000+ lines to 73.
+	nodeSystemStatsURL := "https://" + c.ClusterAddress + ":" + strconv.Itoa(c.Config.ECS.MgmtPort) + "/dashboard/nodes/" + node.ID + "?category=health&dataType=current"
+	log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Debug("URL we are checking for system stats is ", nodeSystemStatsURL)
+
+	// using CallECSAPI because this call requires access to the token
+	respSystemStats, err := c.CallECSAPI(nodeSystemStatsURL)
+	if err != nil {
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error("Error connecting to ECS Cluster.")
+		log.WithFields(log.Fields{"package": "ecsclient", "cluster": c.ClusterAddress}).Error(err)
+		atomic.AddInt64(&c.ErrorCount, 1)
+		ch <- *parsedOutput
+		return
+	}
+
+	// take the current cpu use
+	nodeSustemCPU := gjson.Get(respSystemStats, "nodeCpuUtilizationCurrent.0.Percent").Float()
+	parsedOutput.CPUUtilization = nodeSustemCPU
+	// and take the current memory use
+	nodeSystemMemory := gjson.Get(respSystemStats, "nodeMemoryUtilizationCurrent.0.Percent").Float()
+	parsedOutput.MemoryUtilization = nodeSystemMemory
 	ch <- *parsedOutput
 }
 
