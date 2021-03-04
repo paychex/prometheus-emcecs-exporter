@@ -157,6 +157,14 @@ This exporter exports information in two ways. The first is a standard export of
 # TYPE emcecs_node_dtUnready gauge
 ````
 
+### Node system stats
+````
+# HELP emcecs_node_cpuUtilizationPercent Average current CPU utilization percent on node
+# TYPE emcecs_node_cpuUtilizationPercent gauge
+# HELP emcecs_node_memoryUtilizationPercent Average current memory utilization percent on node
+# TYPE emcecs_node_memoryUtilizationPercent gauge
+````
+
 ### Dell EMC ECS Metering
 
 ````
@@ -197,6 +205,7 @@ $ go build
 ## Refrences
 
 - https://www.emc.com/techpubs/api/ecs/v2-0-0-0/index.htm
+- http://doc.isilon.com/ECS/3.3/API/index.html
 
 ## Author
 
